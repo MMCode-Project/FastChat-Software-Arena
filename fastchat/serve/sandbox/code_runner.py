@@ -16,7 +16,15 @@ E2B_API_KEY = os.environ.get("E2B_API_KEY")
 API key for the e2b API.
 '''
 
-SUPPORTED_SANDBOX_ENVIRONMENTS = ['React','Vue','PyGame','Gradio','Streamlit','Tikz']
+SUPPORTED_SANDBOX_ENVIRONMENTS = [
+    'React',
+    'Vue',
+    'PyGame',
+    'Gradio',
+    'Streamlit',
+    'Tikz'
+    # TODO: Implement auto-detection of sandbox environment
+]
 
 VALID_GRADIO_CODE_LANGUAGES = ['python', 'c', 'cpp', 'markdown', 'json', 'html', 'css', 'javascript', 'jinja2', 'typescript', 'yaml', 'dockerfile', 'shell', 'r', 'sql',
                                'sql-msSQL', 'sql-mySQL', 'sql-mariaDB', 'sql-sqlite', 'sql-cassandra', 'sql-plSQL', 'sql-hive', 'sql-pgSQL', 'sql-gql', 'sql-gpSQL', 'sql-sparkSQL', 'sql-esper']
@@ -108,7 +116,7 @@ Allowed packages: ["tikz", "pgf", "standalone"]
 """
 
 DEFAULT_SANDBOX_INSTRUCTIONS = {
-    "Auto": "Auto-detect the code language and run in the appropriate sandbox.",
+    # "Auto": "Auto-detect the code language and run in the appropriate sandbox.",
     "React": DEFAULT_REACT_SANDBOX_INSTRUCTION,
     "Vue": DEFAULT_VUE_SANDBOX_INSTRUCTION,
     "PyGame": DEFAULT_PYGAME_SANDBOX_INSTRUCTION,
