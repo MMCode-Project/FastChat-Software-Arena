@@ -16,7 +16,7 @@ E2B_API_KEY = os.environ.get("E2B_API_KEY")
 API key for the e2b API.
 '''
 
-SUPPORTED_SANDBOX_ENVIRONMENTS = ['React','Vue','PyGame','Gradio','Auto']
+SUPPORTED_SANDBOX_ENVIRONMENTS = ['React','Vue','PyGame','Gradio','Streamlit','Tikz']
 
 VALID_GRADIO_CODE_LANGUAGES = ['python', 'c', 'cpp', 'markdown', 'json', 'html', 'css', 'javascript', 'jinja2', 'typescript', 'yaml', 'dockerfile', 'shell', 'r', 'sql',
                                'sql-msSQL', 'sql-mySQL', 'sql-mariaDB', 'sql-sqlite', 'sql-cassandra', 'sql-plSQL', 'sql-hive', 'sql-pgSQL', 'sql-gql', 'sql-gpSQL', 'sql-sparkSQL', 'sql-esper']
@@ -91,12 +91,30 @@ Do not use external libraries or import external files outside of the allowed li
 Allowed libraries: ["gradio", "pandas", "numpy", "matplotlib", "requests", "seaborn", "plotly"]
 """
 
+DEFAULT_STREAMLIT_SANDBOX_INSTRUCTION = """
+Generate Python code for a single-file Streamlit application using the Streamlit library. 
+Surround code with ``` in markdown. 
+The app should automatically reload when changes are made. 
+Do not use external libraries or import external files outside of the allowed list.
+Allowed libraries: ["streamlit", "pandas", "numpy", "matplotlib", "requests", "seaborn", "plotly"]
+"""
+
+DEFAULT_TIKZ_SANDBOX_INSTRUCTION = """
+Generate LaTeX code for a single-file TikZ diagram using the TikZ library. 
+Surround the code with ``` in markdown. 
+The code should produce a valid standalone LaTeX document that can be compiled to generate a PDF or image output. 
+Do not include any external packages or dependencies outside of the allowed list.
+Allowed packages: ["tikz", "pgf", "standalone"]
+"""
+
 DEFAULT_SANDBOX_INSTRUCTIONS = {
     "Auto": "Auto-detect the code language and run in the appropriate sandbox.",
     "React": DEFAULT_REACT_SANDBOX_INSTRUCTION,
     "Vue": DEFAULT_VUE_SANDBOX_INSTRUCTION,
     "PyGame": DEFAULT_PYGAME_SANDBOX_INSTRUCTION,
-    "Gradio": DEFAULT_GRADIO_SANDBOX_INSTRUCTION
+    "Gradio": DEFAULT_GRADIO_SANDBOX_INSTRUCTION,
+    "Streamlit": DEFAULT_STREAMLIT_SANDBOX_INSTRUCTION,
+    "Tikz": DEFAULT_TIKZ_SANDBOX_INSTRUCTION
 }
 
 class ChatbotSandboxState(TypedDict):
@@ -171,7 +189,7 @@ def extract_code_from_markdown(message: str) -> tuple[str, str, bool] | None:
         return None
 
     # Determine if the code is related to a webpage
-    if any(word in message.lower() for word in ['typescript', 'javascript', 'react','vue','gradio']):
+    if any(word in message.lower() for word in ['typescript', 'javascript', 'react','vue','gradio','streamlit','tikz']):
         is_webpage = True
     else:
         is_webpage = False
@@ -361,6 +379,72 @@ def run_gradio_sandbox(code: str) -> str:
     sandbox_url = 'https://' + sandbox.get_host(7860)
     return sandbox_url
 
+def run_streamlit_sandbox(code: str) -> str:
+    sandbox = Sandbox(api_key=E2B_API_KEY)
+
+    setup_commands = ["pip install --upgrade streamlit"]
+                    
+    for command in setup_commands:
+        sandbox.commands.run(
+            command,
+            timeout=60 * 3,
+            on_stdout=lambda message: print(message),
+            on_stderr=lambda message: print(message),
+        )
+  
+    sandbox.files.make_dir('mystreamlit')
+    file_path = "~/mystreamlit/app.py"
+    sandbox.files.write(path=file_path, data=code, request_timeout=60)
+    
+    process = sandbox.commands.run(
+        "streamlit run ~/mystreamlit/app.py --server.port 8501 --server.headless true", 
+        background=True
+    )
+    
+    host = sandbox.get_host(port=8501)
+    url = f"https://{host}"
+    return url   
+
+def run_tikz_sandbox(sandbox, code):
+    sandbox = Sandbox(api_key=E2B_API_KEY)
+    
+    setup_commands = [
+        "apt-get update && apt-get install -y texlive-latex-base texlive-pictures texlive-latex-extra"
+    ]
+    
+    for command in setup_commands:
+        sandbox.commands.run(
+            command,
+            timeout=60 * 3,
+            on_stdout=lambda message: print(message),
+            on_stderr=lambda message: print(message),
+        )
+    sandbox.files.make_dir('tikz_sandbox')
+    tex_file_path = "~/tikz_sandbox/diagram.tex"
+    tikz_template = rf"""
+    \documentclass[tikz,border=3.14mm]{{standalone}}
+    \usepackage{{tikz}}
+    \begin{{document}}
+    {code}
+    \end{{document}}
+    """
+    sandbox.files.write(path=tex_file_path, data=tikz_template, request_timeout=60)
+    
+    compile_command = f"pdflatex -output-directory=~/tikz_sandbox {tex_file_path}"
+    sandbox.commands.run(
+        compile_command,
+        timeout=60,
+        on_stdout=lambda message: print(message),
+        on_stderr=lambda message: print(message),
+    )
+    
+    pdf_file_path = "~/tikz_sandbox/diagram.pdf"
+    if sandbox.files.exists(pdf_file_path):
+        pdf_url = sandbox.get_file_url(path=pdf_file_path)
+        return pdf_url
+    else:
+        raise RuntimeError("PDF compilation failed.")
+    
 def on_click_run_code(
         state,
         sandbox_state: ChatbotSandboxState,
@@ -445,6 +529,31 @@ def on_click_run_code(
             ),
             gr.skip(),
         )
+    elif sandbox_state['sandbox_environment'] == 'Streamlit':
+        url = run_streamlit_sandbox(code)
+        yield (
+            gr.Markdown(value="### Running Sandbox", visible=True),
+            SandboxComponent(
+                value=(url, code),
+                label="Example",
+                visible=True,
+                key="newsandbox",
+            ),
+            gr.skip(),
+        )
+    elif sandbox_state['sandbox_environment'] == 'Tikz':
+        url = run_streamlit_sandbox(code)
+        yield (
+            gr.Markdown(value="### Running Sandbox", visible=True),
+            SandboxComponent(
+                value=(url, code),
+                label="Example",
+                visible=True,
+                key="newsandbox",
+            ),
+            gr.skip(),
+        )
+
     else:
         output, results, js_code = run_code_interpreter(
             code=code, code_language=code_language)
