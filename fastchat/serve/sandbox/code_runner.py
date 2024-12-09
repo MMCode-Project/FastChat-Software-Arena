@@ -21,22 +21,14 @@ SUPPORTED_SANDBOX_ENVIRONMENTS =[
     # 'Python',
     # 'Java',
     # 'Javascript',
-    # 'Streamlit',
     'React',
     'Vue',
     'Gradio',
     'NiceGUI',
     'PyGame',
-<<<<<<< HEAD
-    'Gradio',
-    'Streamlit',
-    'Tikz'
-    # TODO: Implement auto-detection of sandbox environment
-=======
     'Streamlit',
     'Tikz'
     # 'Auto' # TODO: Implement auto-detection of sandbox environment
->>>>>>> 37c7825 (Streamlit and Tikz sandbox.)
 ]
 VALID_GRADIO_CODE_LANGUAGES = ['python', 'c', 'cpp', 'markdown', 'json', 'html', 'css', 'javascript', 'jinja2', 'typescript', 'yaml', 'dockerfile', 'shell', 'r', 'sql',
                                'sql-msSQL', 'sql-mySQL', 'sql-mariaDB', 'sql-sqlite', 'sql-cassandra', 'sql-plSQL', 'sql-hive', 'sql-pgSQL', 'sql-gql', 'sql-gpSQL', 'sql-sparkSQL', 'sql-esper']
@@ -133,12 +125,6 @@ Generate a Python NiceGUI code snippet for a single file. Surround code with ```
 
 DEFAULT_SANDBOX_INSTRUCTIONS = {
     # "Auto": "Auto-detect the code language and run in the appropriate sandbox.",
-<<<<<<< HEAD
-    "React": DEFAULT_REACT_SANDBOX_INSTRUCTION,
-    "Vue": DEFAULT_VUE_SANDBOX_INSTRUCTION,
-    "PyGame": DEFAULT_PYGAME_SANDBOX_INSTRUCTION,
-    "Gradio": DEFAULT_GRADIO_SANDBOX_INSTRUCTION
-=======
     "React": DEFAULT_REACT_SANDBOX_INSTRUCTION.strip(),
     "Vue": DEFAULT_VUE_SANDBOX_INSTRUCTION.strip(),
     "NiceGUI": DEFAULT_NICEGUI_SANDBOX_INSTRUCTION.strip(),
@@ -146,7 +132,6 @@ DEFAULT_SANDBOX_INSTRUCTIONS = {
     "PyGame": DEFAULT_PYGAME_SANDBOX_INSTRUCTION.strip(),
     "Streamlit": DEFAULT_STREAMLIT_SANDBOX_INSTRUCTION.strip(),
     "Tikz": DEFAULT_TIKZ_SANDBOX_INSTRUCTION.strip()
->>>>>>> 37c7825 (Streamlit and Tikz sandbox.)
 }
 
 class ChatbotSandboxState(TypedDict):
@@ -221,7 +206,7 @@ def extract_code_from_markdown(message: str) -> tuple[str, str, bool] | None:
         return None
 
     # Determine if the code is related to a webpage
-    if any(word in message.lower() for word in ['typescript', 'javascript', 'react','vue','gradio','streamlit','tikz']):
+    if any(word in message.lower() for word in ['typescript', 'javascript', 'react','vue','gradio','streamlit']):
         is_webpage = True
     else:
         is_webpage = False
