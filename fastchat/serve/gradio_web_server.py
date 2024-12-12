@@ -117,6 +117,8 @@ api_endpoint_info = {}
 class State:
     def __init__(self, model_name, is_vision=False):
         self.conv = get_conversation_template(model_name)
+        if self.conv is None:
+            logger.error(f"get_conversation_template returned None for model_name: {model_name}")
         self.conv_id = uuid.uuid4().hex
         self.skip_next = False
         self.model_name = model_name
@@ -161,6 +163,20 @@ class State:
             base.update({"has_csam_image": self.has_csam_image})
         return base
 
+def update_system_message(state, sandbox_state, model_selector):
+    if state is None:
+        state = State(model_selector)
+
+    if sandbox_state.get('enable_sandbox', False):
+        sandbox_environment = sandbox_state.get('sandbox_environment', '')
+        default_instruction = DEFAULT_SANDBOX_INSTRUCTIONS.get(sandbox_environment, "")
+        logger.info(f"Default instruction for sandbox_env_choice '{sandbox_environment}': {default_instruction}")
+        current_system_message = state.conv.get_system_message(state.is_vision)
+        logger.info(f"Current_system_message for sandbox_env_choice '{sandbox_environment}': {current_system_message}")
+        new_system_message = f"{current_system_message}\n\n{default_instruction}"
+        state.conv.set_system_message(new_system_message)
+        logger.info(f"Updated system message for sandbox_env_choice '{sandbox_environment}': {new_system_message}")
+    return state, state.to_gradio_chatbot()
 
 def set_global_vars(
     controller_url_,
@@ -384,7 +400,7 @@ def add_text(state, model_selector, sandbox_state, text, request: gr.Request):
     text = text[:INPUT_CHAR_LEN_LIMIT]  # Hard cut-off
     state.conv.append_message(state.conv.roles[0], text)
     state.conv.append_message(state.conv.roles[1], None)
-    return (state, state.to_gradio_chatbot(), "") + (disable_btn,) * 5
+    return (state, state.to_gradio_chatbot(), "",sandbox_state) + (disable_btn,) * 5
 
 
 def model_worker_stream_iter(
@@ -979,6 +995,7 @@ def build_single_model_ui(models, add_promotion_links=False):
                 interactive=True,
             )
             sandbox_env_choice = gr.Dropdown(choices=SUPPORTED_SANDBOX_ENVIRONMENTS, label="Sandbox Environment", interactive=True, visible=False)
+            logger.info(f"Initialize sandbox env choice: {sandbox_env_choice.value}")
         with gr.Group():
             sandbox_instruction_accordion = gr.Accordion("Sandbox Instructions", open=False, visible=False)
             with sandbox_instruction_accordion:
@@ -1023,7 +1040,7 @@ def build_single_model_ui(models, add_promotion_links=False):
             fn=lambda enable, env: "" if not enable else DEFAULT_SANDBOX_INSTRUCTIONS.get(env, ""),
             inputs=[enable_sandbox_checkbox, sandbox_env_choice],
             outputs=[sandbox_instruction_textarea]
-        ) .then(
+        ).then(
             fn=update_sandbox_config_single_model,
             inputs=[
                 enable_sandbox_checkbox,
@@ -1126,24 +1143,27 @@ def build_single_model_ui(models, add_promotion_links=False):
         outputs=[sandbox_output, sandbox_ui, sandbox_code]
     )
 
-
-    textbox.submit(
-        add_text,
-        [state, model_selector, sandbox_state, textbox],
-        [state, chatbot, textbox, sandbox_state] + btn_list,
-    ).then(
-        bot_response,
-        [state, temperature, top_p, max_output_tokens, sandbox_state],
-        [state, chatbot] + btn_list,
-    ).then(
-        lambda sandbox_state: gr.update(interactive=sandbox_state['enabled_round'] == 0),
-        inputs=[sandbox_state],
-        outputs=[sandbox_env_choice]
-    )
+    # textbox.submit(
+    #     add_text,
+    #     [state, model_selector, sandbox_state, textbox],
+    #     [state, chatbot, textbox, sandbox_state] + btn_list,
+    # ).then(
+    #     bot_response,
+    #     [state, temperature, top_p, max_output_tokens, sandbox_state],
+    #     [state, chatbot] + btn_list,
+    # ).then(
+    #     lambda sandbox_state: gr.update(interactive=sandbox_state['enabled_round'] == 0),
+    #     inputs=[sandbox_state],
+    #     outputs=[sandbox_env_choice]
+    # )
     send_btn.click(
+        update_system_message,
+        [state, sandbox_state, model_selector],
+        [state, chatbot]
+    ).then(
         add_text,
         [state, model_selector, sandbox_state, textbox],
-        [state, chatbot, textbox] + btn_list,
+        [state, chatbot, textbox,sandbox_state] + btn_list,
     ).then(
         bot_response,
         [state, temperature, top_p, max_output_tokens, sandbox_state],
