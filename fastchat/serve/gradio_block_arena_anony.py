@@ -20,7 +20,7 @@ from fastchat.constants import (
     SURVEY_LINK,
 )
 from fastchat.model.model_adapter import get_conversation_template
-from fastchat.serve.gradio_block_arena_named import flash_buttons
+from fastchat.serve.gradio_block_arena_named import flash_buttons,update_system_messages
 from fastchat.serve.gradio_web_server import (
     State,
     bot_response,
@@ -352,10 +352,10 @@ def add_text(
             + [""]
         )
     # add snadbox instructions if enabled
-    if sandbox_state0['enable_sandbox'] and sandbox_state0['enabled_round'] == 0:
-        text = f"> {sandbox_state0['sandbox_instruction']}\n\n" + text
-        sandbox_state0['enabled_round'] += 1
-        sandbox_state1['enabled_round'] += 1
+    # if sandbox_state0['enable_sandbox'] and sandbox_state0['enabled_round'] == 0:
+    #     text = f"> {sandbox_state0['sandbox_instruction']}\n\n" + text
+    #     sandbox_state0['enabled_round'] += 1
+    #     sandbox_state1['enabled_round'] += 1
 
     text = text[:BLIND_MODE_INPUT_CHAR_LEN_LIMIT]  # Hard cut-off
     for i in range(num_sides):
@@ -758,28 +758,32 @@ function (a, b, c, d) {
 """
     share_btn.click(share_click, states + model_selectors, [], js=share_js)
 
-    textbox.submit(
+    # textbox.submit(
+    #     add_text,
+    #     states + model_selectors + sandbox_states + [textbox],
+    #     states + chatbots + sandbox_states + [textbox] + btn_list + [slow_warning],
+    # ).then(
+    #     bot_response_multi,
+    #     states + [temperature, top_p, max_output_tokens] + sandbox_states,
+    #     states + chatbots + btn_list,
+    # ).then(
+    #     flash_buttons,
+    #     [],
+    #     btn_list,
+    # ).then(
+    #     lambda sandbox_state: gr.update(interactive=sandbox_state['enabled_round'] == 0),
+    #     inputs=[sandbox_states[0]],
+    #     outputs=[sandbox_env_choice]
+    # )
+
+    send_btn.click(
+        update_system_messages,
+        states + sandbox_states + model_selectors,
+        states + chatbots 
+    ).then(
         add_text,
         states + model_selectors + sandbox_states + [textbox],
         states + chatbots + sandbox_states + [textbox] + btn_list + [slow_warning],
-    ).then(
-        bot_response_multi,
-        states + [temperature, top_p, max_output_tokens] + sandbox_states,
-        states + chatbots + btn_list,
-    ).then(
-        flash_buttons,
-        [],
-        btn_list,
-    ).then(
-        lambda sandbox_state: gr.update(interactive=sandbox_state['enabled_round'] == 0),
-        inputs=[sandbox_states[0]],
-        outputs=[sandbox_env_choice]
-    )
-
-    send_btn.click(
-        add_text,
-        states + model_selectors + sandbox_states + [textbox],
-        states + chatbots + sandbox_states + [textbox] + btn_list,
     ).then(
         bot_response_multi,
         states + [temperature, top_p, max_output_tokens] + sandbox_states,

@@ -117,8 +117,6 @@ api_endpoint_info = {}
 class State:
     def __init__(self, model_name, is_vision=False):
         self.conv = get_conversation_template(model_name)
-        if self.conv is None:
-            logger.error(f"get_conversation_template returned None for model_name: {model_name}")
         self.conv_id = uuid.uuid4().hex
         self.skip_next = False
         self.model_name = model_name
@@ -163,20 +161,6 @@ class State:
             base.update({"has_csam_image": self.has_csam_image})
         return base
 
-def update_system_message(state, sandbox_state, model_selector):
-    if state is None:
-        state = State(model_selector)
-
-    if sandbox_state.get('enable_sandbox', False):
-        sandbox_environment = sandbox_state.get('sandbox_environment', '')
-        default_instruction = DEFAULT_SANDBOX_INSTRUCTIONS.get(sandbox_environment, "")
-        logger.info(f"Default instruction for sandbox_env_choice '{sandbox_environment}': {default_instruction}")
-        current_system_message = state.conv.get_system_message(state.is_vision)
-        logger.info(f"Current_system_message for sandbox_env_choice '{sandbox_environment}': {current_system_message}")
-        new_system_message = f"{current_system_message}\n\n{default_instruction}"
-        state.conv.set_system_message(new_system_message)
-        logger.info(f"Updated system message for sandbox_env_choice '{sandbox_environment}': {new_system_message}")
-    return state, state.to_gradio_chatbot()
 
 def set_global_vars(
     controller_url_,
@@ -360,6 +344,17 @@ def get_ip(request: gr.Request):
         ip = request.client.host
     return ip
 
+def update_system_message(state, sandbox_state, model_selector):
+    if state is None:
+        state = State(model_selector)
+
+    if sandbox_state.get('enable_sandbox', False):
+        sandbox_environment = sandbox_state.get('sandbox_environment', '')
+        default_instruction = DEFAULT_SANDBOX_INSTRUCTIONS.get(sandbox_environment, "")
+        current_system_message = state.conv.get_system_message(state.is_vision)
+        new_system_message = f"{current_system_message}\n\n{default_instruction}"
+        state.conv.set_system_message(new_system_message)
+    return state, state.to_gradio_chatbot()
 
 def add_text(state, model_selector, sandbox_state, text, request: gr.Request):
     ip = get_ip(request)
@@ -373,6 +368,7 @@ def add_text(state, model_selector, sandbox_state, text, request: gr.Request):
         return (state, state.to_gradio_chatbot(), "", None) + (no_change_btn,) * 5
 
     all_conv_text = state.conv.get_prompt()
+    logger.info(f"Generated prompt: {all_conv_text}")
     all_conv_text = all_conv_text[-2000:] + "\nuser: " + text
     flagged = moderation_filter(all_conv_text, [state.model_name])
     # flagged = moderation_filter(text, [state.model_name])
@@ -388,14 +384,14 @@ def add_text(state, model_selector, sandbox_state, text, request: gr.Request):
             no_change_btn,
         ) * 5
 
-    # [CODE SANDBOX] add sandbox instructions if enabled
-    try:
-        # only add sandbox instructions if enabled for the first round
-        if sandbox_state['enable_sandbox'] and sandbox_state['enabled_round'] == 0:
-            text = f"> {sandbox_state['sandbox_instruction'].strip()}\n\n" + text
-            sandbox_state['enabled_round'] += 1
-    except (TypeError, KeyError) as e:
-        print("Error accessing sandbox_state:", e)
+    # # [CODE SANDBOX] add sandbox instructions if enabled
+    # try:
+    #     # only add sandbox instructions if enabled for the first round
+    #     if sandbox_state['enable_sandbox'] and sandbox_state['enabled_round'] == 0:
+    #         text = f"> {sandbox_state['sandbox_instruction'].strip()}\n\n" + text
+    #         sandbox_state['enabled_round'] += 1
+    # except (TypeError, KeyError) as e:
+    #     print("Error accessing sandbox_state:", e)
 
     text = text[:INPUT_CHAR_LEN_LIMIT]  # Hard cut-off
     state.conv.append_message(state.conv.roles[0], text)
@@ -548,7 +544,7 @@ def bot_response(
         )
     else:
         # Remove system prompt for API-based models unless specified
-        custom_system_prompt = model_api_dict.get("custom_system_prompt", False)
+        custom_system_prompt = model_api_dict.get("custom_system_prompt", True)
         if not custom_system_prompt:
             conv.set_system_message("")
 
@@ -995,7 +991,6 @@ def build_single_model_ui(models, add_promotion_links=False):
                 interactive=True,
             )
             sandbox_env_choice = gr.Dropdown(choices=SUPPORTED_SANDBOX_ENVIRONMENTS, label="Sandbox Environment", interactive=True, visible=False)
-            logger.info(f"Initialize sandbox env choice: {sandbox_env_choice.value}")
         with gr.Group():
             sandbox_instruction_accordion = gr.Accordion("Sandbox Instructions", open=False, visible=False)
             with sandbox_instruction_accordion:
