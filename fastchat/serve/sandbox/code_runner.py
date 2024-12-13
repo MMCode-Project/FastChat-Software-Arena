@@ -133,6 +133,7 @@ class ChatbotSandboxState(TypedDict):
     Chatbot sandbox state in gr.state.
     '''
     enable_sandbox: bool
+    is_code_edited: bool # whether the user has edited the code
     sandbox_environment: str | None
     sandbox_instruction: str | None
     code_to_execute: str | None
@@ -145,6 +146,7 @@ def create_chatbot_sandbox_state() -> ChatbotSandboxState:
     '''
     return {
         "enable_sandbox": False,
+        "is_code_edited": False,
         "sandbox_environment": None,
         "sandbox_instruction": None,
         "code_to_execute": "",
@@ -508,19 +510,25 @@ def on_click_run_code(
     if not E2B_API_KEY:
         raise ValueError("E2B_API_KEY is not set in env vars.")
 
-    code, code_language, is_web_page = extract_result
+    if not sandbox_state['is_code_edited']:
+        code, code_language, is_web_page = extract_result
 
-    # validate whether code to execute has been updated.
-    previous_code = sandbox_state.get('code_to_execute', '')
-    if previous_code == code:
-        print("Code has not changed. Skipping execution.")
-        yield (
-            gr.skip(),
-            gr.skip(),
-            gr.skip()
-        )
-        return
-    sandbox_state['code_to_execute'] = code
+        # validate whether code to execute has been updated.
+        previous_code = sandbox_state.get('code_to_execute', '')
+        if previous_code == code:
+            print("Code has not changed. Skipping execution.")
+            yield (
+                gr.skip(),
+                gr.skip(),
+                gr.skip()
+            )
+            return
+        sandbox_state['code_to_execute'] = code
+    else:
+        code = sandbox_code.value
+        code_language = extract_result[1]
+        is_web_page = extract_result[2]
+        sandbox_state['code_to_execute'] = code
 
     if code_language == 'tsx':
         code_language = 'typescript'

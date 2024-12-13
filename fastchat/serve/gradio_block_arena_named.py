@@ -463,7 +463,7 @@ def build_side_by_side_ui_named(models):
                                     )
 
                                 with gr.Tab(label="Code", visible=False) as sandbox_code_tab:
-                                    sandbox_code = gr.Code(value="", interactive=False, visible=False)
+                                    sandbox_code = gr.Code(value="", interactive=True, visible=False)
 
                                 sandbox_states.append(sandbox_state)
                                 sandboxes_components.append((
@@ -673,12 +673,28 @@ function (a, b, c, d) {
         state = states[chatbotIdx]
         sandbox_state = sandbox_states[chatbotIdx]
         sandbox_components = sandboxes_components[chatbotIdx]
+        sandbox_code = sandbox_components[2]
 
         # trigger sandbox run
         chatbot.select(
+            lambda sandbox_state: {**sandbox_state, 'is_code_edited': False},
+            [sandbox_state],
+            [sandbox_state]
+        ).then(
             fn=on_click_run_code,
-            inputs=[state, sandbox_state, *sandbox_components],
-            outputs=[*sandbox_components],
+            inputs=[state, sandbox_state, sandbox_output, sandbox_ui, sandbox_code],
+            outputs=[sandbox_output, sandbox_ui, sandbox_code]
+        )
+
+        #run sandbox after code has been edited
+        sandbox_code.change(
+            lambda sandbox_state: {**sandbox_state, 'is_code_edited': True},
+            [sandbox_state],
+            [sandbox_state]        
+        ).then(
+            fn=on_click_run_code,
+            inputs=[state, sandbox_state, sandbox_output, sandbox_ui,sandbox_code],
+            outputs=[sandbox_output, sandbox_ui, sandbox_code]
         )
 
     return states + model_selectors

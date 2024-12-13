@@ -966,7 +966,7 @@ def build_single_model_ui(models, add_promotion_links=False):
                                 visible=False,
                             )
                         with sandbox_code_tab:
-                            sandbox_code = gr.Code(value="", interactive=False, visible=False)
+                            sandbox_code = gr.Code(value="", interactive=True, visible=False)
 
                         sandboxes_components.append((
                             sandbox_output,
@@ -1131,10 +1131,28 @@ def build_single_model_ui(models, add_promotion_links=False):
     )
 
     sandbox_components = sandboxes_components[0]
-    # trigger sandbox run
-    chatbot.select(fn=on_click_run_code,
-                   inputs=[state, sandbox_state, sandbox_output, sandbox_ui, sandbox_code],
-                   outputs=[sandbox_output, sandbox_ui, sandbox_code])
+    #trigger sandbox run
+    chatbot.select(
+        lambda sandbox_state: {**sandbox_state, 'is_code_edited': False},
+        [sandbox_state],
+        [sandbox_state]
+    ).then(
+        fn=on_click_run_code,
+        inputs=[state, sandbox_state, sandbox_output, sandbox_ui, sandbox_code],
+        outputs=[sandbox_output, sandbox_ui, sandbox_code]
+    )
+
+    # run sandbox after code has been edited
+    sandbox_code.change(
+        lambda sandbox_state: {**sandbox_state, 'is_code_edited': True},
+        [sandbox_state],
+        [sandbox_state]        
+    ).then(
+        fn=on_click_run_code,
+        inputs=[state, sandbox_state, sandbox_output, sandbox_ui,sandbox_code],
+        outputs=[sandbox_output, sandbox_ui, sandbox_code]
+    )
+
 
     return [state, model_selector]
 
