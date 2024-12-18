@@ -448,7 +448,7 @@ def build_side_by_side_ui_named(models):
                         sandbox_hidden_components.append(sandbox_row)
                         for chatbotIdx in range(num_sides):
                             with gr.Column(scale=1, visible=False) as column:
-                                sandbox_state = gr.State(create_chatbot_sandbox_state())
+                                sandbox_state = gr.State(create_chatbot_sandbox_state(btn_list_length=6))
                                 # Add containers for the sandbox output
                                 sandbox_title = gr.Markdown(value=f"### Model {chatbotIdx + 1} Sandbox", visible=False)
     
@@ -687,32 +687,28 @@ function (a, b, c, d) {
         chatbot = chatbots[chatbotIdx]
         state = states[chatbotIdx]
         sandbox_state = sandbox_states[chatbotIdx]
+        sandbox_components = sandboxes_components[chatbotIdx]
         model_selector = model_selectors[chatbotIdx]
 
         send_btns_one_side[chatbotIdx].click(
-        add_text,
-        [state, model_selector, sandbox_state, textbox],
-        [state, chatbot, textbox] + btn_list,
-    ).then(
-        update_sandbox_system_message,
-        [state, sandbox_state, model_selector],
-        [state, chatbot]
-    ).then(
-        bot_response,
-        [state, temperature, top_p, max_output_tokens, sandbox_state],
-        [state, chatbot] + btn_list,
-    ).then(
-        lambda sandbox_state: gr.update(interactive=sandbox_state['enabled_round'] == 0),
-        inputs=[sandbox_state],
-        outputs=[sandbox_env_choice]
+            add_text,
+            [state, model_selector, sandbox_state, textbox],
+            [state, chatbot, textbox] + btn_list,
+        ).then(
+            update_sandbox_system_message,
+            [state, sandbox_state, model_selector],
+            [state, chatbot]
+        ).then(
+            bot_response,
+            [state, temperature, top_p, max_output_tokens, sandbox_state],
+            [state, chatbot] + btn_list,
+        ).then(
+            flash_buttons, [], btn_list
+        ).then(
+            lambda sandbox_state: gr.update(interactive=sandbox_state['enabled_round'] == 0),
+            inputs=[sandbox_state],
+            outputs=[sandbox_env_choice]
     )
-
-
-    for chatbotIdx in range(num_sides):
-        chatbot = chatbots[chatbotIdx]
-        state = states[chatbotIdx]
-        sandbox_state = sandbox_states[chatbotIdx]
-        sandbox_components = sandboxes_components[chatbotIdx]
 
         # trigger sandbox run when click code message
         chatbot.select(
