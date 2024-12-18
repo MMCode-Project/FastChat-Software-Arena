@@ -37,6 +37,8 @@ from fastchat.utils import (
     moderation_filter,
 )
 
+from fastchat.serve.gradio_web_server import update_sandbox_system_message, add_text
+
 logger = build_logger("gradio_web_server_multi", "gradio_web_server_multi.log")
 
 num_sides = 2
@@ -184,14 +186,14 @@ def update_sandbox_system_messages_multi(state0, state1, sandbox_state0, sandbox
 
     return states + [x.to_gradio_chatbot() for x in states]
 
-def add_text(
+def add_text_multi(
     state0, state1,
     model_selector0, model_selector1,
     sandbox_state0, sandbox_state1,
     text, request: gr.Request
 ):
     ip = get_ip(request)
-    logger.info(f"add_text (named). ip: {ip}. len: {len(text)}")
+    logger.info(f"add_text_multi (named). ip: {ip}. len: {len(text)}")
     states = [state0, state1]
     model_selectors = [model_selector0, model_selector1]
     sandbox_states = [sandbox_state0, sandbox_state1]
@@ -517,6 +519,9 @@ def build_side_by_side_ui_named(models):
             elem_id="input_box",
         )
         send_btn = gr.Button(value="Send", variant="primary", scale=0)
+        send_btn_left = gr.Button(value="Send to Left", variant="primary", scale=0)
+        send_btn_right = gr.Button(value="Send to Right", variant="primary", scale=0)
+        send_btns_one_side = [send_btn_left, send_btn_right]
 
     with gr.Row() as button_row:
         clear_btn = gr.Button(value="🗑️  Clear history", interactive=False)
@@ -639,7 +644,7 @@ function (a, b, c, d) {
         )
 
     textbox.submit(
-        add_text,
+        add_text_multi,
         states + model_selectors + sandbox_states + [textbox],
         states + chatbots + sandbox_states + [textbox] + btn_list,
     ).then(
@@ -659,7 +664,7 @@ function (a, b, c, d) {
     )
 
     send_btn.click(
-        add_text,
+        add_text_multi,
         states + model_selectors + sandbox_states + [textbox],
         states + chatbots + sandbox_states + [textbox] + btn_list,
     ).then(
@@ -677,6 +682,31 @@ function (a, b, c, d) {
         inputs=[sandbox_states[0]],
         outputs=[sandbox_env_choice]
     )
+
+    for chatbotIdx in range(num_sides):
+        chatbot = chatbots[chatbotIdx]
+        state = states[chatbotIdx]
+        sandbox_state = sandbox_states[chatbotIdx]
+        model_selector = model_selectors[chatbotIdx]
+
+        send_btns_one_side[chatbotIdx].click(
+        add_text,
+        [state, model_selector, sandbox_state, textbox],
+        [state, chatbot, textbox] + btn_list,
+    ).then(
+        update_sandbox_system_message,
+        [state, sandbox_state, model_selector],
+        [state, chatbot]
+    ).then(
+        bot_response,
+        [state, temperature, top_p, max_output_tokens, sandbox_state],
+        [state, chatbot] + btn_list,
+    ).then(
+        lambda sandbox_state: gr.update(interactive=sandbox_state['enabled_round'] == 0),
+        inputs=[sandbox_state],
+        outputs=[sandbox_env_choice]
+    )
+
 
     for chatbotIdx in range(num_sides):
         chatbot = chatbots[chatbotIdx]
